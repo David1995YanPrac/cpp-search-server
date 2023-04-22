@@ -37,7 +37,7 @@ vector<string> SplitIntoWords(const string& text) {
                 word.clear();
             }
         }
-        else 
+        else
         {
             word += c;
         }
@@ -47,6 +47,16 @@ vector<string> SplitIntoWords(const string& text) {
     }
 
     return words;
+}
+
+//
+// ВОПРОС - подскажите пожалуйста, почему при выносе расчета log в отдельный метод, мы облегчаем расчёт для программы ?
+//
+double log1(int doc_count, map<string, map<int, double>> docs, string str1)
+{
+    double IDF1 = log(static_cast<double>(doc_count) / docs.at(str1).size());
+
+    return IDF1;
 }
 
 struct Document
@@ -62,7 +72,7 @@ public:
 
     void SetStopWords(const string& text) {
 
-        for (const string& word : SplitIntoWords(text)) 
+        for (const string& word : SplitIntoWords(text))
         {
             stop_words_.insert(word);
         }
@@ -115,6 +125,7 @@ private:
     {
 
         vector<string> words;
+
         for (const string& word : SplitIntoWords(text))
         {
             if (!IsStopWord(word))
@@ -128,24 +139,9 @@ private:
     set<string> ParseQuery(const string& text) const
     {
 
-        set<string> query_words;
-        for (const string& word : SplitIntoWordsNoStop(text))
-        {
-            query_words.insert(word);
-        }
-        return query_words;
-    }
-
-    vector<Document> FindAllDocuments(const set<string>& query_words) const
-    {
-
-        vector<Document> doc;
-
-        map<int, double> document_to_relevance;
-
         set<string> minus_slov;
-
-        for (string str1 : query_words)
+        
+        for (string str1 : SplitIntoWords(text))
         {
             for (char ch1 : str1)
             {
@@ -158,16 +154,36 @@ private:
             }
         }
 
-        for (string str1 : query_words)
+        set<string> query_words;
+
+        for (const string& word : SplitIntoWordsNoStop(text))
         {
-            if (minus_slov.count(str1) != 0)
+            if (minus_slov.count(word) > 0)
             {
                 continue;
             }
+            query_words.insert(word);
+        }
 
-            else if (new_documents_.count(str1) != 0)
+        return query_words;
+    }
+
+    vector<Document> FindAllDocuments(const set<string>& query_words) const
+    {
+
+        vector<Document> doc;
+
+        map<int, double> document_to_relevance;
+
+        for (string str1 : query_words)
+        {
+            if (new_documents_.count(str1) != 0)
             {
-                double IDF1 = log(static_cast<double>(document_count_) / new_documents_.at(str1).size());
+                //
+                // ВОПРОС - подскажите пожалуйста, почему при выносе расчета log в отдельный метод, мы облегчаем расчёт для программы ?
+                //
+                double IDF1 = log1(document_count_, new_documents_, str1);
+
                 for (const auto& [id, TF] : new_documents_.at(str1))
                 {
                     document_to_relevance[id] = document_to_relevance[id] + TF * IDF1;
