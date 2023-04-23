@@ -49,9 +49,6 @@ vector<string> SplitIntoWords(const string& text) {
     return words;
 }
 
-//
-// ВОПРОС - подскажите пожалуйста, почему при выносе расчета log в отдельный метод, мы облегчаем расчёт для программы ?
-//
 double log1(int doc_count, map<string, map<int, double>> docs, string str1)
 {
     double IDF1 = log(static_cast<double>(doc_count) / docs.at(str1).size());
@@ -96,7 +93,7 @@ public:
 
     }
 
-    vector<Document> FindTopDocuments(const string& raw_query) const 
+    vector<Document> FindTopDocuments(const string& raw_query) const
     {
 
         const Query query_words = ParseQuery(raw_query);
@@ -104,11 +101,11 @@ public:
         auto matched_documents = FindAllDocuments(query_words);
 
         sort(matched_documents.begin(), matched_documents.end(),
-            [](const Document& lhs, const Document& rhs) 
+            [](const Document& lhs, const Document& rhs)
             {
                 return lhs.relevance > rhs.relevance;
             });
-        if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) 
+        if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT)
         {
             matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
         }
@@ -150,40 +147,29 @@ private:
     Query ParseQuery(const string& text) const
     {
         Query query;
-        
+
         set<string> minus_slov;
 
         for (string str1 : SplitIntoWords(text))
         {
-            for (char ch1 : str1)
-            {
-                if (ch1 == '-')
+                if (str1[0] == '-')
                 {
                     str1.erase(0, 1);
                     minus_slov.insert(str1);
                     continue;
                 }
-            }
-        }
-
-        //set<string> query_words;
-
-        for (string word : SplitIntoWords(text))
-        {
-            if (!stop_words_.count(word) > 0)
-            {
-                if (!minus_slov.count(word) > 0)
+                else if (!stop_words_.count(str1) > 0)
                 {
-                    query.words2.insert(word);
+                    if (!minus_slov.count(str1) > 0)
+                    {
+                        query.words2.insert(str1);
+                    }
+                    else
+                    {
+                        query.minus2.insert(str1);
+                    }
                 }
-                else
-                {
-                    query.words2.insert(word);
-                }
-            }
-            
         }
-
 
         return query;
     }
@@ -201,14 +187,14 @@ private:
             {
                 continue;
             }
-            
+
             double IDF1 = log1(document_count_, new_documents_, str1);
-            
+
             for (const auto& [id, TF] : new_documents_.at(str1))
             {
                 document_to_relevance[id] = document_to_relevance[id] + TF * IDF1;
             }
-            
+
         }
 
         for (string str1 : query_words.minus2)
