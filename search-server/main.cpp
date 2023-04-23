@@ -65,6 +65,8 @@ struct Document
     double relevance;
 };
 
+
+
 class SearchServer
 {
 public:
@@ -94,16 +96,20 @@ public:
 
     }
 
-    vector<Document> FindTopDocuments(const string& raw_query) const {
+    vector<Document> FindTopDocuments(const string& raw_query) const 
+    {
 
-        const set<string> query_words = ParseQuery(raw_query);
+        const Query query_words = ParseQuery(raw_query);
+
         auto matched_documents = FindAllDocuments(query_words);
 
         sort(matched_documents.begin(), matched_documents.end(),
-            [](const Document& lhs, const Document& rhs) {
+            [](const Document& lhs, const Document& rhs) 
+            {
                 return lhs.relevance > rhs.relevance;
             });
-        if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
+        if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) 
+        {
             matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
         }
         return matched_documents;
@@ -115,6 +121,11 @@ private:
 
     set<string> stop_words_;
 
+    struct Query
+    {
+        set<string> words2;
+        set<string> minus2;
+    };
 
     bool IsStopWord(const string& word) const
     {
@@ -136,11 +147,12 @@ private:
         return words;
     }
 
-    set<string> ParseQuery(const string& text) const
+    Query ParseQuery(const string& text) const
     {
-
-        set<string> minus_slov;
+        Query query;
         
+        set<string> minus_slov;
+
         for (string str1 : SplitIntoWords(text))
         {
             for (char ch1 : str1)
@@ -154,40 +166,61 @@ private:
             }
         }
 
-        set<string> query_words;
+        //set<string> query_words;
 
-        for (const string& word : SplitIntoWordsNoStop(text))
+        for (string word : SplitIntoWords(text))
         {
-            if (minus_slov.count(word) > 0)
+            if (!stop_words_.count(word) > 0)
             {
-                continue;
+                if (!minus_slov.count(word) > 0)
+                {
+                    query.words2.insert(word);
+                }
+                else
+                {
+                    query.words2.insert(word);
+                }
             }
-            query_words.insert(word);
+            
         }
 
-        return query_words;
+
+        return query;
     }
 
-    vector<Document> FindAllDocuments(const set<string>& query_words) const
+    vector<Document> FindAllDocuments(const Query& query_words) const
     {
 
         vector<Document> doc;
 
         map<int, double> document_to_relevance;
 
-        for (string str1 : query_words)
+        for (string str1 : query_words.words2)
         {
-            if (new_documents_.count(str1) != 0)
+            if (new_documents_.count(str1) == 0)
             {
-                //
-                // ВОПРОС - подскажите пожалуйста, почему при выносе расчета log в отдельный метод, мы облегчаем расчёт для программы ?
-                //
-                double IDF1 = log1(document_count_, new_documents_, str1);
+                continue;
+            }
+            
+            double IDF1 = log1(document_count_, new_documents_, str1);
+            
+            for (const auto& [id, TF] : new_documents_.at(str1))
+            {
+                document_to_relevance[id] = document_to_relevance[id] + TF * IDF1;
+            }
+            
+        }
 
-                for (const auto& [id, TF] : new_documents_.at(str1))
-                {
-                    document_to_relevance[id] = document_to_relevance[id] + TF * IDF1;
-                }
+        for (string str1 : query_words.minus2)
+        {
+            if (new_documents_.count(str1) == 0)
+            {
+                continue;
+            }
+
+            for (const auto& [id, TF] : new_documents_.at(str1))
+            {
+                document_to_relevance.erase(id);
             }
         }
 
