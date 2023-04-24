@@ -118,6 +118,13 @@ private:
 
     set<string> stop_words_;
 
+    struct QueryWord
+    {
+        string text;
+        bool is_minus;
+        bool is_stop;
+    };
+
     struct Query
     {
         set<string> words2;
@@ -144,31 +151,41 @@ private:
         return words;
     }
 
+    QueryWord ParseQueryWord(string text) const
+    {
+        bool is_minus = false;
+
+        if (text[0] == '-')
+        {
+            is_minus = true;
+            text = text.substr(1);
+        }
+
+        return { text, is_minus, IsStopWord(text) };
+    }
+
     Query ParseQuery(const string& text) const
     {
         Query query;
 
-        set<string> minus_slov;
+        //set<string> minus_slov;
 
         for (string str1 : SplitIntoWords(text))
         {
-                if (str1[0] == '-')
+
+            QueryWord query_word = ParseQueryWord(str1);
+
+            if (!query_word.is_stop)
+            {
+                if (query_word.is_minus)
                 {
-                    str1.erase(0, 1);
-                    minus_slov.insert(str1);
-                    continue;
+                    query.minus2.insert(query_word.text);
                 }
-                else if (!stop_words_.count(str1) > 0)
+                else
                 {
-                    if (!minus_slov.count(str1) > 0)
-                    {
-                        query.words2.insert(str1);
-                    }
-                    else
-                    {
-                        query.minus2.insert(str1);
-                    }
+                    query.words2.insert(str1);
                 }
+            }
         }
 
         return query;
