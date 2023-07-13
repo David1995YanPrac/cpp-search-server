@@ -57,6 +57,21 @@ enum class DocumentStatus {
     BANNED,
     REMOVED,
 };
+
+constexpr double EPSILON = 1e-6;
+
+auto compareDocuments = [](const Document& lhs, const Document& rhs) 
+{
+    if (abs(lhs.relevance - rhs.relevance) < EPSILON) 
+    {
+        return lhs.rating > rhs.rating;
+    }
+    else 
+    {
+        return lhs.relevance > rhs.relevance;
+    }
+};
+
 class SearchServer {
 public:
     void SetStopWords(const string& text) {
@@ -83,16 +98,10 @@ public:
         const Query query = ParseQuery(raw_query);
         auto matched_documents = FindAllDocuments(query, document_predicate);
 
-        sort(matched_documents.begin(), matched_documents.end(),
-            [](const Document& lhs, const Document& rhs) {
-                if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
-                    return lhs.rating > rhs.rating;
-                }
-                else {
-                    return lhs.relevance > rhs.relevance;
-                }
-            });
-        if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
+        sort(matched_documents.begin(), matched_documents.end(),compareDocuments );
+
+        if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) 
+        {
             matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
         }
         return matched_documents;
@@ -105,16 +114,11 @@ public:
         const Query query = ParseQuery(raw_query);
         auto matched_documents = FindAllDocuments(query, status);
 
-        sort(matched_documents.begin(), matched_documents.end(),
-            [](const Document& lhs, const Document& rhs) {
-                if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
-                    return lhs.rating > rhs.rating;
-                }
-                else {
-                    return lhs.relevance > rhs.relevance;
-                }
-            });
-        if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
+        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! продолжить правки с этого места
+        sort(matched_documents.begin(), matched_documents.end(),compareDocuments );
+        
+        if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) 
+        {
             matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
         }
         return matched_documents;
@@ -324,7 +328,7 @@ private:
    Подставьте сюда вашу реализацию макросов
    ASSERT, ASSERT_EQUAL, ASSERT_EQUAL_HINT, ASSERT_HINT и RUN_TEST
    */
-   template <typename T>
+template <typename T>
 ostream& operator<<(ostream& os, const vector<T>& v)
 {
     os << "[";
@@ -399,13 +403,13 @@ void AssertEqualImpl(const T& t, const U& u, const string& t_str, const string& 
 #define ASSERT_EQUAL_HINT(a, b, hint) AssertEqualImpl((a), (b), #a, #b, __FILE__, __FUNCTION__, __LINE__, (hint))
 
 void AssertImpl(bool value, const string& expr_str, const string& file, const string& func, unsigned line,
-    const string& hint) 
+    const string& hint)
 {
-    if (!value) 
+    if (!value)
     {
         cerr << file << "("s << line << "): "s << func << ": "s;
         cerr << "ASSERT("s << expr_str << ") failed."s;
-        if (!hint.empty()) 
+        if (!hint.empty())
         {
             cerr << " Hint: "s << hint;
         }
@@ -423,12 +427,12 @@ void AssertImpl(bool value, const string& expr_str, const string& file, const st
 // -------- Начало модульных тестов поисковой системы ----------
 
 // Тест проверяет, что поисковая система исключает стоп-слова при добавлении документов
-void TestExcludeStopWordsFromAddedDocumentContent() 
+void TestExcludeStopWordsFromAddedDocumentContent()
 {
     const int doc_id = 42;
     const string content = "cat in the city"s;
     const vector<int> ratings = { 1, 2, 3 };
-    {
+    
         // Сначала убеждаемся, что поиск слова, не входящего в список стоп-слов,
         // находит нужный документ
         SearchServer server;
@@ -437,9 +441,16 @@ void TestExcludeStopWordsFromAddedDocumentContent()
         ASSERT_EQUAL(found_docs.size(), 1u);
         const Document& doc0 = found_docs[0];
         ASSERT_EQUAL(doc0.id, doc_id);
-    }
+    
+}
 
-    {
+void TestReturnEmptyDocument()
+{
+    const int doc_id = 42;
+    const string content = "cat in the city"s;
+    const vector<int> ratings = { 1, 2, 3 };
+
+    
         // Затем убеждаемся, что поиск этого же слова, входящего в список стоп-слов,
         // возвращает пустой результат
         SearchServer server;
@@ -447,29 +458,40 @@ void TestExcludeStopWordsFromAddedDocumentContent()
         server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
         ASSERT_HINT(server.FindTopDocuments("in"s).empty(),
             "Stop words must be excluded from documents"s);
-    }
-
-    // мои тесты
-
     
+}
+
+void TestDocumentsWithMinusWords()
+{
+    const int doc_id = 42;
+    const string content = "cat in the city"s;
+    const vector<int> ratings = { 1, 2, 3 };
+    // мои тесты
     // Поддержка минус-слов. Документы, содержащие минус-слова поискового запроса, не должны включаться в результаты поиска.
     const string content1 = "cat -in the city"s;
 
-    {
+    
         SearchServer server;
         server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
         const auto found_docs = server.FindTopDocuments(content1);
         //assert(found_docs.size() == 0);
 
-        ASSERT_HINT(found_docs.size()==0,
+        ASSERT_HINT(found_docs.size() == 0,
             "doc with minus words must not be in documents"s);
-    }
-
     
+}
+
+void TestDocumentsWithMinusWordsThenEmptyDoc()
+{
+    const int doc_id = 42;
+    const string content = "cat in the city"s;
+    const vector<int> ratings = { 1, 2, 3 };
+    const string content1 = "cat -in the city"s;
+
     // Матчинг документов. При матчинге документа по поисковому запросу должны быть возвращены все слова из поискового запроса, присутствующие в документе. Если есть соответствие хотя бы по одному минус-слову, должен возвращаться пустой список слов.
     const vector<string> query_word_in_doc = { "city", "in" };
     const vector<string> query_word_in_doc_min = {};
-    {
+    
         SearchServer server;
         server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
         const auto found_docs = server.FindTopDocuments("in city"s);
@@ -482,27 +504,34 @@ void TestExcludeStopWordsFromAddedDocumentContent()
         tuple<vector<string>, DocumentStatus> mutch1 = server1.MatchDocument("in -city", doc_id);
         ASSERT_HINT(get<0>(mutch1) == query_word_in_doc_min, "all word must be apsent");
 
-    }
-
     
+}
+
+void TestDocumentsReturnSortRelevanse()
+{
     // Сортировка найденных документов по релевантности. Возвращаемые при поиске документов результаты должны быть отсортированы в порядке убывания релевантности.
-    {
+    
         SearchServer server;
         server.AddDocument(0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, { 8, -3 });
         server.AddDocument(1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, { 7, 2, 7 });
 
         const auto found_docs1 = server.FindTopDocuments("пушистый кот"s);
 
-        ASSERT_HINT(found_docs1[0].id == 1 && found_docs1[1].id == 0, "not correct");
-
-    }
+        ASSERT_HINT(found_docs1[0].relevance > found_docs1[1].relevance, "not correct");
 
     
+}
 
+void TestDocumentsRatingAverage()
+{
+    const vector<int> ratings = { 1, 2, 3 };
+    const vector<int> ratings2 = { -3, 3, 3 };
     //Вычисление рейтинга документов. Рейтинг добавленного документа равен среднему арифметическому оценок документа.
-    {
+    
         SearchServer server;
+
         server.AddDocument(0, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, ratings);
+        server.AddDocument(1, "пушистый кот уехал в Москву"s, DocumentStatus::ACTUAL, ratings2);
 
         const auto found_docs1 = server.FindTopDocuments("пушистый кот"s);
 
@@ -513,16 +542,29 @@ void TestExcludeStopWordsFromAddedDocumentContent()
         {
             rating_sum += rating;
         }
-        static int rating_sum1 = rating_sum / static_cast<int>(ratings.size());
+        static int rating_sum_aver1 = 2;
 
-        ASSERT_EQUAL_HINT(rating_sum1, rating_doc, "average is not correct");
+        ASSERT_EQUAL_HINT(rating_sum_aver1, rating_doc, "average is not correct");
 
-    }
+
+        int rating_doc2 = found_docs1[1].rating;
+
+        int rating_sum2 = 0;
+        for (const int rating : ratings2)
+        {
+            rating_sum2 += rating;
+        }
+        static int rating_sum_aver2 = 1;
+
+        ASSERT_EQUAL_HINT(rating_sum_aver2, rating_doc2, "average is not correct");
 
     
+}
 
+void TestDocumentsUsePredicate()
+{
     // Фильтрация результатов поиска с использованием предиката, задаваемого пользователем.
-    {
+    
         SearchServer server;
         server.AddDocument(0, "пушистый кот"s, DocumentStatus::IRRELEVANT, { 8, -3 });
         server.AddDocument(1, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, { 8, -3 });
@@ -532,8 +574,74 @@ void TestExcludeStopWordsFromAddedDocumentContent()
 
         ASSERT_HINT(found_docs1[0].id == 2 && found_docs1[1].id == 1, "filtr with predicate is not correct");
 
-    }
     
+
+}
+
+void TestSearchDocStatus()
+{
+    SearchServer server;
+
+    server.AddDocument(0, "иди сюда", DocumentStatus::ACTUAL, { 1, 2, 3 });
+    server.AddDocument(1, "иди туда", DocumentStatus::BANNED , { 1, 2, 3 });
+    server.AddDocument(2, "иди на право", DocumentStatus::IRRELEVANT, { 1, 2, 3 });
+    server.AddDocument(3, "иди на лево", DocumentStatus::REMOVED, { 1, 2, 3 });
+
+    vector<Document> actual_doc = server.FindTopDocuments("иди", DocumentStatus::ACTUAL);
+    ASSERT_HINT(actual_doc.size() == 1, "doc with ACTUAL status is empty");
+    ASSERT_HINT(actual_doc[0].id == 0, "doc with ACTUAL status is empty");
+
+    vector<Document> ban_doc = server.FindTopDocuments("иди", DocumentStatus::BANNED);
+    ASSERT_HINT(ban_doc.size() == 1, "doc with ACTUAL status is empty");
+    ASSERT_HINT(ban_doc[0].id == 1, "doc with ACTUAL status is empty");
+
+    vector<Document> irr_doc = server.FindTopDocuments("иди", DocumentStatus::IRRELEVANT);
+    ASSERT_HINT(irr_doc.size() == 1, "doc with ACTUAL status is empty");
+    ASSERT_HINT(irr_doc[0].id == 2, "doc with ACTUAL status is empty");
+
+    vector<Document> rem_doc = server.FindTopDocuments("иди", DocumentStatus::REMOVED);
+    ASSERT_HINT(rem_doc.size() == 1, "doc with ACTUAL status is empty");
+    ASSERT_HINT(rem_doc[0].id == 3, "doc with ACTUAL status is empty");
+
+    
+
+}
+
+void TestSearchDocFind()
+{
+
+    SearchServer server;
+
+    server.AddDocument(0, "иди сюда", DocumentStatus::ACTUAL, { 4 });
+    server.AddDocument(1, "иди туда", DocumentStatus::ACTUAL, { 3 });
+    server.AddDocument(2, "иди на право", DocumentStatus::ACTUAL, { 2 });
+    server.AddDocument(3, "иди на лево", DocumentStatus::ACTUAL, { 1 });
+
+    vector<Document> doc = server.FindTopDocuments("иди");
+    ASSERT_HINT(doc[0].id == 0, "doc is not here");
+    ASSERT_HINT(doc[1].id == 1, "doc is not here");
+    ASSERT_HINT(doc[2].id == 2, "doc is not here");
+    ASSERT_HINT(doc[3].id == 3, "doc is not here");
+
+}
+
+void TestRelevanseCalculation()
+{
+
+    SearchServer server;
+
+    server.AddDocument(0, "иди туда", DocumentStatus::ACTUAL, { 4, 6, 2 });
+    server.AddDocument(1, "иди туда где ты", DocumentStatus::ACTUAL, { 9 , -3, 3 });
+    server.AddDocument(2, "иди вон там", DocumentStatus::ACTUAL, { 2 });
+    server.AddDocument(3, "иди туда на всегда со мной", DocumentStatus::ACTUAL, { 1 });
+
+    vector<Document> doc = server.FindTopDocuments("иди туда");
+
+    ASSERT_HINT(abs(doc[0].relevance - 0.143841036225) < EPSILON, "error not correct");
+    ASSERT_HINT(abs(doc[1].relevance - 0.071920518113) < EPSILON, "error not correct");
+    ASSERT_HINT(abs(doc[2].relevance - 0.047947012075) < EPSILON, "error not correct");
+    ASSERT_HINT(abs(doc[3].relevance - 0) < EPSILON, "error not correct");
+
 }
 
 /*
@@ -541,10 +649,18 @@ void TestExcludeStopWordsFromAddedDocumentContent()
 */
 
 // Функция TestSearchServer является точкой входа для запуска тестов
-void TestSearchServer() 
+void TestSearchServer()
 {
     TestExcludeStopWordsFromAddedDocumentContent();
-
+    TestReturnEmptyDocument();
+    TestDocumentsWithMinusWords();
+    TestDocumentsWithMinusWordsThenEmptyDoc();
+    TestDocumentsReturnSortRelevanse();
+    TestDocumentsRatingAverage();
+    TestDocumentsUsePredicate();
+    TestSearchDocStatus();
+    TestSearchDocFind();
+    TestRelevanseCalculation();
     // Не забудьте вызывать остальные тесты здесь
 }
 
