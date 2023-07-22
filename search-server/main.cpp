@@ -133,21 +133,12 @@ public:
 
     int GetDocumentId(int pos)
     {
-        
-        //добавил запись id добавляемых документов в контейнер doc_id
-        //но не понял зачем использовать тут метод at (переделанная текущая версия метода getDocumentID ниже
-        //дайте пожалуйста наводку как правильно отработать ваше замечание
+        //если то как я сейчас сделал правильно, то это гараздо лучше чем было раньше))) спасибо
 
+        doc_id.at(pos);
 
-        if (pos >= 0 && pos < static_cast<int>(doc_id.size()))
-        {
-            return doc_id[pos];
-        }
+        return doc_id[pos];
 
-        else
-        {
-            throw out_of_range("id меньше нуля или выходит за пределы");
-        }
     }
 
 
@@ -466,11 +457,11 @@ int main() {
 
     try
     {
-        search_server.GetDocumentId(-1);
+        search_server.GetDocumentId(2);
     }
     catch (const out_of_range& miss)
     {
-        cout << miss.what() << endl;
+        cout << "тест с GetDocumentId " << miss.what() << endl;
     }
 
     cout << endl;
